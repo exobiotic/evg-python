@@ -60,6 +60,7 @@ class MainHandler(tornado.web.RequestHandler):
                 self.set_status(200)
                 self.set_header('Content-Type', 'application/json')
                 self.write(response)
+                self.finish()
 
         except Exception as e:
             print(e)
@@ -75,37 +76,65 @@ def make_app():
         (r"/.*", MainHandler),
     ])
 
+
 def start_server(port):
-    'Starts the server on specified port'
     print('Starting HTTP server at port %d' % port)
     app = make_app()
-    app.listen(port)
+    app.listen(port, address="0.0.0.0")  # explicit: listen on all interfaces
     try:
         tornado.ioloop.IOLoop.current().start()
     except KeyboardInterrupt:
         pass
 
+
+
 def register_player(port):
-    'Register the player with the game server'
     info = player.get_player_info()
-    info["address"] = "http://10.0.75.1:" + str(port)
+
+    # Where EvG is reachable FROM WINDOWS (this script runs on Windows)
+    evg_base = os.environ.get("EVG_SERVER", "http://127.0.0.1:5000")
+    evg_url = evg_base.rstrip("/") + "/api/players"
+
+    # The callback address EvG should use to reach THIS bot.
+    # Set this to an IP that the EvG container can reach.
+    public_host = os.environ.get("PLAYER_HOST", "10.255.255.254")
+    info["address"] = f"http://{public_host}:{port}"
+
     http_client = HTTPClient()
     http_client.fetch(
         HTTPRequest(
-            'http://localhost:8080/api/players',
+            evg_url,
             method="POST",
-            headers={
-                'Content-Type': 'application/json'
-            },
+            headers={'Content-Type': 'application/json'},
             body=json.dumps(info, sort_keys=True, indent=2).encode()
         )
     )
 
+def safe_register(port):
+    try:
+        register_player(port)
+        print("Registered player OK")
+    except Exception as e:
+        print(f"register_player failed (continuing): {e}")
+
+def monitor_changes(port):
+    last_write_time = os.path.getmtime('player.py')
+    while running:
+        current_write_time = os.path.getmtime('player.py')
+        if last_write_time != current_write_time:
+            last_write_time = current_write_time
+            print('Change detected')
+            importlib.reload(player)
+            #safe_register(port)
+        sleep(1)
+    print('Stopping')
+
 if __name__ == '__main__':
     port = 9080
-    register_player(port)
+    #safe_register(port)  # <— no longer fatal
     monitor = threading.Thread(target=monitor_changes, args=(port,))
     monitor.start()
     start_server(port)
     running = False
     monitor.join()
+

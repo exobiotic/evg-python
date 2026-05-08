@@ -2,10 +2,10 @@
 
 from game import Action, is_empty, Unit, GameState, build_distance_map
 
+
 def get_actions(state):
-  return [
-    Action('move', 'left')
-  ]
+    return [ Action("Move", "Up") ]
+
 
 def get_player_info():
   return {

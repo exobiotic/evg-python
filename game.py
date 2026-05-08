@@ -52,11 +52,16 @@ class GameState:
     for foe in self.foes:
       if foe.health > 0:
         self.empty_map[foe.x][foe.y] = False
-
+"""
 class Action:
   def __init__(self, action_type: str, direction: str):
     self.type = action_type
     self.direction = direction
+"""
+class Action:
+    def __init__(self, actionType, direction):
+        self.actionType = actionType
+        self.direction = direction
 
 def is_empty(x: int, y: int, state: GameState):
   return state.empty_map[x][y]
